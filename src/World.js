@@ -1,3 +1,4 @@
+import { Body, DrawableBody } from './Body.js';
 import { EdgeMode } from './enums.js';
 
 /**
@@ -16,6 +17,7 @@ export class World {
     this.areas = []; // Store array of areas
     this.G = createVector(0, 0.1); // Gravity vector
     this.edgeMode = EdgeMode.None; // What to do when body encountered an edge?
+    this.doCollisions = true;
   }
 
   /** Get number of bodies in this World */
@@ -51,13 +53,36 @@ export class World {
       // Apply gravity
       if (this.G) {
         let G = p5.Vector.mult(this.G, body.mass); // Gravoty is constant regardless of mass
-        body.apply(G);
+        body.applyForce(G);
       }
 
       body.update();
 
       // Check edges
       if (edges) body.edges();
+    });
+
+    let calculatedCollisions = []; // Array of objects { a, b } wherein collision physics has been done.
+    const doneCollision = (a, b) => {
+      for (let c of calculatedCollisions) {
+        if ((c.a === a && c.b === b) || (c.a === b && c.b === a)) return true;
+      }
+      return false;
+    };
+
+    this.bodies.forEach(bodyA => {
+      // Collisions?
+      if (this.doCollisions && bodyA.solid) {
+        this.bodies.forEach(bodyB => {
+          if (bodyA !== bodyB && !doneCollision(bodyA, bodyB)) {
+            let collide = DrawableBody.collision(bodyA, bodyB);
+            if (collide && bodyA.vel.copy().sub(bodyB.vel).mag() > 0) { // Only execute if collision AND bodies are moving closer
+              Body.collide(bodyA, bodyB);
+              calculatedCollisions.push({ a: bodyA, b: bodyB });
+            }
+          }
+        });
+      }
     });
   }
 

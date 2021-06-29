@@ -11,5 +11,6 @@ export const DrawableBodyMode = Object.freeze({
   Point: 1, // Single point with no width or height
   Ellipse: 2,
   Rectange: 3,
-  Path: 4, // Draw using points in this.path attribute
+  Triangle: 4,
+  Path: 10, // Draw using points in this.path attribute
 });
