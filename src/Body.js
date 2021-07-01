@@ -6,9 +6,9 @@ var __body_id = 0;
 export class Body {
   constructor(x, y, w = 0, h = 0) {
     this._id = __body_id++;
-    this.pos = createVector(x, y);
-    this.vel = createVector(0, 0);
-    this.acc = createVector(0, 0);
+    this._pos = createVector(x, y);
+    this._vel = createVector(0, 0);
+    this._acc = createVector(0, 0);
     this._w = w;
     this._h = h;
     this._mass = 1;
@@ -21,11 +21,79 @@ export class Body {
 
     this.cbOnUpdate = () => true; // If returns false, update will halt
     this.cbOnApply = f => f; // NOTE - called before force is applied
+    this.cbChangePos = () => { };
+    this.cbChangeVel = () => { };
+    this.cbChangeAcc = () => { };
   }
 
   get ID() { return this._id; }
   get w() { return this._w; } // SHORTHAND
   get h() { return this._h; } // SHORTHAND
+
+  /** Get/Set position vector (sets/returns a copy) */
+  pos(vector = undefined) {
+    if (vector === undefined) return this._pos.copy();
+    this._pos = vector.copy();
+    this.cbChangePos();
+    return this;
+  }
+
+  posX(x = undefined) {
+    if (x === undefined) return this._pos.x;
+    this._pos.x = +x;
+    this.cbChangePos();
+    return this;
+  }
+
+  posY(y = undefined) {
+    if (y === undefined) return this._pos.y;
+    this._pos.y = +y;
+    this.cbChangePos();
+    return this;
+  }
+
+  /** Get/Set velocity vector (sets/returns a copy) */
+  vel(vector = undefined) {
+    if (vector === undefined) return this._vel.copy();
+    this._vel = vector.copy();
+    this.cbChangeVel();
+    return this;
+  }
+
+  velX(x = undefined) {
+    if (x === undefined) return this._vel.x;
+    this._vel.x = +x;
+    this.cbChangeVel();
+    return this;
+  }
+
+  velY(y = undefined) {
+    if (y === undefined) return this._vel.y;
+    this._vel.y = +y;
+    this.cbChangeVel();
+    return this;
+  }
+
+  /** Get/Set acceleration vector (sets/returns a copy) */
+  acc(vector = undefined) {
+    if (vector === undefined) return this._acc.copy();
+    this._acc = vector.copy();
+    return this;
+  }
+
+  accX(x = undefined) {
+    if (x === undefined) return this._acc.x;
+    this._acc.x = +x;
+    this.cbChangeAcc();
+    return this;
+  }
+
+  accY(y = undefined) {
+    if (y === undefined) return this._acc.y;
+    this._acc.y = +y;
+    this.cbChangeAcc();
+    return this;
+  }
 
   /** Get/Set width */
   width(value = undefined) {
@@ -75,9 +143,9 @@ export class Body {
   /* Apply physics to said particle */
   update() {
     if (!this.static || this.cbOnUpdate() === false) {
-      this.vel.add(this.acc); // Apply acceleration - change of velocity
-      this.pos.add(this.vel); // Apply velocity - change of position
-      this.acc.set(0, 0); // Cancel acceleration
+      this.vel(this.vel().add(this.acc())); // Apply acceleration - change of velocity
+      this.pos(this.pos().add(this.vel())); // Apply velocity - change of position
+      this.acc(createVector(0, 0));
       return true;
     }
     return false;
@@ -91,7 +159,7 @@ export class Body {
     if (!this.static) {
       let f = p5.Vector.div(force, this._mass);
       f = this.cbOnApply(f);
-      this.acc.add(f);
+      this.acc(this.acc().add(f));
     }
     return this;
   }
@@ -104,31 +172,31 @@ export class Body {
         break;
       case EdgeMode.Hold:
         // Align self with world edge
-        if (this.pos.x < W.x) this.pos.x = W.x;
-        if (this.pos.x > W.x + W.w) this.pos.x = W.x + W.w;
-        if (this.pos.y < W.y) this.pos.y = W.y;
-        if (this.pos.y > W.y + W.h) this.pos.y = W.y + W.h;
+        if (this.posX() < W.x) this.posX(W.x);
+        if (this.posX() > W.x + W.w) this.posX(W.x + W.w);
+        if (this.posY() < W.y) this.posY(W.y);
+        if (this.posY() > W.y + W.h) this.posY(W.y + W.h);
         break;
       case EdgeMode.Wrap:
-        if (this.pos.x < W.x) this.pos.x = W.x + W.w;
-        else if (this.pos.x > W.x + W.w) this.pos.x = W.x;
-        if (this.pos.y < W.y) this.pos.y = W.y + W.h;
-        else if (this.pos.y > W.y + W.h) this.pos.y = W.y;
+        if (this.posX() < W.x) this.posX(W.x + W.w);
+        else if (this.posX() > W.x + W.w) this.posX(W.x);
+        if (this.posY() < W.y) this.posY(W.y + W.h);
+        else if (this.posY() > W.y + W.h) this.posY(W.y);
         break;
       case EdgeMode.Bounce:
-        if (this.pos.x < W.x) {
-          this.pos.x = W.x;
-          this.vel.x *= -1;
-        } else if (this.pos.x > W.x + W.w) {
-          this.pos.x = W.x + W.w;
-          this.vel.x *= -1;
+        if (this.posX() < W.x) {
+          this.posX(W.x);
+          this.velX(-this.velX());
+        } else if (this.posX() > W.x + W.w) {
+          this.posX(W.x + W.w);
+          this.velX(-this.velX());
         }
-        if (this.pos.y < W.y) {
-          this.pos.y = W.y;
-          this.vel.y *= -1;
-        } else if (this.pos.y > W.y + W.h) {
-          this.pos.y = W.y + W.h;
-          this.vel.y *= -1;
+        if (this.posY() < W.y) {
+          this.posY(W.y);
+          this.velY(-this.velY());
+        } else if (this.posY() > W.y + W.h) {
+          this.posY(W.y + W.h);
+          this.velY(-this.velY());
         }
         break;
       default:
@@ -152,26 +220,25 @@ export class Body {
     if (a.solid && b.solid) {
       // For static bodies: disregard mass
       if (a.static) {
-        b.vel.mult(-b.coefficientOfRestitution());
+        b.vel(b.vel().mult(-b.coefficientOfRestitution()));
         return;
       } else if (b.static) {
-        console.log("Static!");
-        a.vel.mult(-a.coefficientOfRestitution());
+        b.vel(a.vel().mult(-a.coefficientOfRestitution()));
         return;
       }
 
       const a_m = a.mass(), b_m = b.mass();
-      const a_mu = a.vel.copy().mult(a_m); // a: mass * velocity
-      const b_mu = b.vel.copy().mult(b_m); // a: mass * velocity
+      const a_mu = a.vel().mult(a_m); // a: mass * velocity
+      const b_mu = b.vel().mult(b_m); // a: mass * velocity
 
       // v(a) = [Cr * m(b) * [u(b) - u(a)] + m(a) * u(a) + m(b) * u(b)] / [m(a) + m(b)]
-      let velA = b.vel.copy().sub(a.vel).mult(b_m).mult(a.coefficientOfRestitution()).add(a_mu).add(b_mu).div(a_m + b_m);
+      let velA = b.vel().sub(a.vel()).mult(b_m).mult(a.coefficientOfRestitution()).add(a_mu).add(b_mu).div(a_m + b_m);
 
       // v(b) = [Cr * m(a) * [u(a) - u(b)] + m(a) * u(a) + m(b) * u(b)] / [m(a) + m(b)]
-      let velB = a.vel.copy().sub(b.vel).mult(a_m).mult(b.coefficientOfRestitution()).add(a_mu).add(b_mu).div(a_m + b_m);
+      let velB = a.vel().sub(b.vel()).mult(a_m).mult(b.coefficientOfRestitution()).add(a_mu).add(b_mu).div(a_m + b_m);
 
-      a.vel.set(velA.x, velA.y);
-      b.vel.set(velB.x, velB.y);
+      a.vel(velA);
+      b.vel(velB);
     }
   }
 }
@@ -183,42 +250,50 @@ export class DrawableBody extends Body {
     this._stroke = null; // P5 colour object OR null
     this._fill = color(0); // P5 colour object OR null
     this._mode = DrawableBodyMode.Rectangle;
-    this._path = []; // If mode=Path :: path to draw
+    this._oPath = []; // Path vertices relative to this.pos
+    this._path = []; // If mode=Path :: path to draw (relative to this.pos)
     this._pointMotion = false; // Point shape in direction of motion?
     this._bb = { pos: createVector(NaN, NaN), w: 0, h: 0 }; // BOUNDING BOX
     this._calcBoundingBox();
+
+    this.cbChangePos = () => {
+      if (this._mode === DrawableBodyMode.Path) {
+        this._path = this._oPath.map(v => ([v[0] + this._pos.x, v[1] + this._pos.y]));
+      }
+    };
   }
 
   /** Calculate bounding box */
   _calcBoundingBox() {
     switch (this._mode) {
       case DrawableBodyMode.Point:
-        this._bb.pos = this.pos.copy();
+        this._bb.pos = this.pos();
         this._bb.w = 1;
         this._bb.h = 1;
         break;
       case DrawableBodyMode.Ellipse:
-        this._bb.pos = createVector(this.pos.x - this._w / 2, this.pos.y - this._h / 2);
+        this._bb.pos = createVector(this.posX() - this._w / 2, this.posY() - this._h / 2);
         this._bb.w = this._w;
         this._bb.h = this._h;
         break;
       case DrawableBodyMode.Rectangle:
-        this._bb.pos = createVector(this.pos.x, this.pos.y);
+        this._bb.pos = this.pos();
         this._bb.w = this._w;
         this._bb.h = this._h;
         break;
-      case DrawableBodyMode.Triangle:
-        this._bb.pos = createVector(this.pos.x - this._w / 2, this.pos.y - this._h / 2);
-        this._bb.w = this._w;
-        this._bb.h = this._h;
+      case DrawableBodyMode.Path: {
+        let topleft = [Infinity, Infinity], bottomright = [-Infinity, -Infinity];
+        for (let vertex of this._path) {
+          if (vertex[0] < topleft[0]) topleft[0] = vertex[0];
+          if (vertex[1] < topleft[1]) topleft[1] = vertex[1];
+          if (vertex[0] > bottomright[0]) bottomright[0] = vertex[0];
+          if (vertex[1] > bottomright[1]) bottomright[1] = vertex[1];
+        }
+        this._bb.pos = createVector(...topleft);
+        this._bb.w = bottomright[0] - topleft[0];
+        this._bb.h = bottomright[1] - topleft[1];
         break;
-      case DrawableBodyMode.Path:
-        // TODO
-        if (this._world === null || this._world.logWarnings) console.warn(`Bounding box support for path not implemented`);
-        this._bb.pos = this.pos.copy();
-        this._bb.w = 1;
-        this._bb.h = 1;
-        break;
+      }
       default:
         throw new Error(`_calcBoundingBox(): Cannot create bounding box for DrawableBody of mode ${this._mode}`);
     }
@@ -268,9 +343,16 @@ export class DrawableBody extends Body {
     this._mode = DrawableBodyMode.Path;
     if (vertices[0] !== null) {
       this._path = vertices;
+      this._oPath = vertices.map(v => ([v[0] - this._pos.x, v[1] - this._pos.y]));
       this._calcBoundingBox();
     }
     return this;
+  }
+
+  /** Create a triangle */
+  setTriangle() {
+    const w2 = this._w / 2, h2 = this._h / 2, pos = this.pos();
+    return this.setPolygon([pos.x - w2, pos.y - h2], [pos.x - w2, pos.y + h2], [pos.x + w2, pos.y]);
   }
 
   update() {
@@ -284,31 +366,18 @@ export class DrawableBody extends Body {
 
     switch (this._mode) {
       case DrawableBodyMode.Point:
-        point(this.pos.x, this.pos.y);
+        point(this.posX(), this.posY());
         break;
       case DrawableBodyMode.Ellipse:
-        ellipse(this.pos.x, this.pos.y, this._w, this._h);
+        ellipse(this.posX(), this.posY(), this._w, this._h);
         break;
       case DrawableBodyMode.Rectangle:
-        rect(this.pos.x, this.pos.y, this._w, this._h);
+        rect(this.posX(), this.posY(), this._w, this._h);
         break;
       case DrawableBodyMode.Path:
         beginShape();
         this._path.forEach(p => vertex(...p));
-        endShape();
-        break;
-      case DrawableBodyMode.Triangle: {
-        let w2 = this._w / 2, h2 = this._h / 2;
-        push();
-        translate(this.pos.x, this.pos.y);
-        if (this._pointDir) {
-          let heading = this.vel.heading();
-          rotate(heading);
-        }
-        triangle(-w2, -h2, -w2, h2, w2, 0);
-        point(0, 0);
-        pop();
-      }
+        endShape(CLOSE);
         break;
       default:
         throw new Error(`show(): Unknown draw mode ${this._mode}`);
@@ -326,28 +395,46 @@ export class DrawableBody extends Body {
 
   /** Test - is there a collision between the two given DrawableBody objects? */
   static collision(a, b) {
-    // TODO add collision supports for DrawableBodyMode.Path
-    if (a._mode === DrawableBodyMode.Point && b._mode === DrawableBodyMode.Point) { // Point, Point
-      return Math.floor(a.pos.x) === Math.floor(b.pos.x) && Math.floor(a.pos.y) === Math.floor(b.pos.y); // Points must be equal (to nearest pixel)
-    } else if (a._mode === DrawableBodyMode.Ellipse && b._mode === DrawableBodyMode.Ellipse) { // Ellipse, Ellipse
-      return collideCircleCircle(a.pos.x, a.pos.y, a.w, b.pos.x, b.pos.y, b.w);
-    } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Rectangle) { // Rectangle, Rectangle
-      return collideRectRect(a.pos.x, a.pos.y, a.w, a.h, b.pos.x, b.pos.y, b.w, b.h);
-    } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Ellipse) { // Rectangle, Ellipse
-      return collideRectCircle(a.pos.x, a.pos.y, a.w, a.h, b.pos.x, b.pos.y, b.w);
-    } else if (a._mode === DrawableBodyMode.Ellipse && b._mode === DrawableBodyMode.Rectangle) { // Ellipse, Rectangle
-      return collideRectCircle(b.pos.x, b.pos.y, b.w, b.h, a.pos.x, a.pos.y, a.w);
-    } else if (a._mode === DrawableBodyMode.Point && b._mode === DrawableBodyMode.Ellipse) { // Point, Ellipse
-      return collidePointEllipse(a.pos.x, a.pos.y, b.pos.x, b.pos.y, b.w, b.h);
-    } else if (a._mode === DrawableBodyMode.Ellipse && b._mode === DrawableBodyMode.Point) { // Ellipse, Point
-      return collidePointEllipse(b.pos.x, b.pos.y, a.pos.x, a.pos.y, a.w, a.h);
-    } else if (a._mode === DrawableBodyMode.Point && b._mode === DrawableBodyMode.Rectangle) { // Point, Rectangle
-      return collidePointRect(a.pos.x, a.pos.y, b.pos.x, b.pos.y, b.w, b.h);
-    } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Point) { // Rectangle, Point
-      return collidePointRect(b.pos.x, b.pos.y, a.pos.x, a.pos.y, a.w, a.h);
+    let baseCollide = collideRectRect(a._bb.pos.x, a._bb.pos.y, a._bb.w, a._bb.h, b._bb.pos.x, b._bb.pos.y, b._bb.w, b._bb.h);
+    if (baseCollide) {
+      if (a._mode === DrawableBodyMode.Point && b._mode === DrawableBodyMode.Point) { // Point, Point
+        return Math.floor(a._pos.x) === Math.floor(b._pos.x) && Math.floor(a._pos.y) === Math.floor(b._pos.y); // Points must be equal (to nearest pixel)
+      } else if (a._mode === DrawableBodyMode.Ellipse && b._mode === DrawableBodyMode.Ellipse) { // Ellipse, Ellipse
+        return collideCircleCircle(a._pos.x, a._pos.y, a.w, b._pos.x, b._pos.y, b.w);
+      } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Rectangle) { // Rectangle, Rectangle
+        return collideRectRect(a._pos.x, a._pos.y, a.w, a.h, b._pos.x, b._pos.y, b.w, b.h);
+      } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Ellipse) { // Rectangle, Ellipse
+        return collideRectCircle(a._pos.x, a._pos.y, a.w, a.h, b._pos.x, b._pos.y, b.w);
+      } else if (a._mode === DrawableBodyMode.Ellipse && b._mode === DrawableBodyMode.Rectangle) { // Ellipse, Rectangle
+        return collideRectCircle(b._pos.x, b._pos.y, b.w, b.h, a._pos.x, a._pos.y, a.w);
+      } else if (a._mode === DrawableBodyMode.Point && b._mode === DrawableBodyMode.Ellipse) { // Point, Ellipse
+        return collidePointEllipse(a._pos.x, a._pos.y, b._pos.x, b._pos.y, b.w, b.h);
+      } else if (a._mode === DrawableBodyMode.Ellipse && b._mode === DrawableBodyMode.Point) { // Ellipse, Point
+        return collidePointEllipse(b._pos.x, b._pos.y, a._pos.x, a._pos.y, a.w, a.h);
+      } else if (a._mode === DrawableBodyMode.Point && b._mode === DrawableBodyMode.Rectangle) { // Point, Rectangle
+        return collidePointRect(a._pos.x, a._pos.y, b._pos.x, b._pos.y, b.w, b.h);
+      } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Point) { // Rectangle, Point
+        return collidePointRect(b._pos.x, b._pos.y, a._pos.x, a._pos.y, a.w, a.h);
+      } else if (a._mode === DrawableBodyMode.Point && b._mode === DrawableBodyMode.Path) { // Point, Path
+        return collidePointPoly(a._pos.x, a._pos.y, b._path.map(a => createVector(...a)));
+      } else if (a._mode === DrawableBodyMode.Path && b._mode === DrawableBodyMode.Point) { // Path, Point
+        return collidePointPoly(b._pos.x, b._pos.y, a._path.map(a => createVector(...a)));
+      } else if (a._mode === DrawableBodyMode.Ellipse && b._mode === DrawableBodyMode.Path) { // Ellipse, Path
+        return collideCirclePoly(a._pos.x, a._pos.y, a.w, b._path.map(a => createVector(...a)), true);
+      } else if (a._mode === DrawableBodyMode.Path && b._mode === DrawableBodyMode.Ellipse) { // Path, Ellipse
+        return collideCirclePoly(b._pos.x, b._pos.y, b.w, a._path.map(a => createVector(...a)), true);
+      } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Path) { // Rectangle, Path
+        return collideRectPoly(a._pos.x, a._pos.y, a.w, a.h, b._path.map(a => createVector(...a)), true);
+      } else if (a._mode === DrawableBodyMode.Path && b._mode === DrawableBodyMode.Rectangle) { // Path, Rectangle
+        return collideRectPoly(b._pos.x, b._pos.y, b.w, b.h, a._path.map(a => createVector(...a)), true);
+      } else if (a._mode === DrawableBodyMode.Path && b._mode === DrawableBodyMode.Path) { // Path, Path
+        return collidePolyPoly(a._path.map(a => createVector(...a)), b._path.map(a => createVector(...a)), true);
+      } else {
+        if (a._world.logWarnings || b._world.logWarnings)
+          console.warn(`collision(): Unable to determine colission between ${a} (${a._mode}) and ${b} (${b._mode})`);
+        return false;
+      }
     } else {
-      if (a._world.logWarnings || b._world.logWarnings)
-        console.warn(`collision(): Unable to determine colission between ${a} (${a._mode}) and ${b} (${b._mode})`);
       return false;
     }
   }

@@ -78,7 +78,7 @@ export class World {
         this.bodies.forEach(bodyB => {
           if (bodyA !== bodyB && !doneCollision(bodyA, bodyB)) {
             let collide = DrawableBody.collision(bodyA, bodyB);
-            if (collide && bodyA.vel.copy().sub(bodyB.vel).mag() > 0) { // Only execute if collision AND bodies are moving closer
+            if (collide && bodyA.vel().sub(bodyB.vel()).mag() > 0) { // Only execute if collision AND bodies are moving closer
               Body.collide(bodyA, bodyB);
               calculatedCollisions.push({ a: bodyA, b: bodyB });
               // let FrA = bodyA.friction(bodyB);

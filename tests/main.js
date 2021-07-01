@@ -3,6 +3,7 @@ import { DrawableBodyMode, EdgeMode } from '../src/enums.js';
 import World from '../src/World.js';
 
 var world, plane;
+const TWO_PI = 2 * Math.PI;
 
 // This will be exposed to the global scope
 globalThis.globals = {
@@ -11,7 +12,7 @@ globalThis.globals = {
 
 function createBody(x, y) {
   const b = new DrawableBody(x, y, 25, 25)
-    .setDrawMode(DrawableBodyMode.Triangle)
+    .setPolygon(...createPolygonPath(x, y, 25, Math.floor(random(3, 10))))
     .fill(51)
     .stroke(255);
   // b.mass(Math.floor(random(1, 10)));
@@ -54,3 +55,10 @@ function mousePressed() {
   world.addBody(b);
 }
 globalThis.mousePressed = mousePressed;
+
+const rotateCoords = (cx, cy, r, θ) => ([cx + r * Math.cos(θ), cy + r * Math.sin(θ)]);
+
+function createPolygonPath(x, y, r, n) {
+  const δθ = TWO_PI / n;
+  return new Array(n).fill(0).map((_, i) => rotateCoords(x, y, r, i * δθ));
+}
