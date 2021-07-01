@@ -9,10 +9,11 @@ export class Body {
     this.pos = createVector(x, y);
     this.vel = createVector(0, 0);
     this.acc = createVector(0, 0);
-    this.w = w;
-    this.h = h;
-    this.mass = 1;
+    this._w = w;
+    this._h = h;
+    this._mass = 1;
     this._cr = 1; // Coefficient of restitution. 1 = perfectly elastic.
+    this.μ = 0; // Roughness - coefficient of friction. 0 = smooth.
 
     this._world = null;
     this.static = false; // Apply physics to said body?
@@ -23,14 +24,51 @@ export class Body {
   }
 
   get ID() { return this._id; }
+  get w() { return this._w; } // SHORTHAND
+  get h() { return this._h; } // SHORTHAND
+
+  /** Get/Set width */
+  width(value = undefined) {
+    if (typeof value === 'number') {
+      this._w = value;
+      return this;
+    }
+    return this._w;
+  }
+
+  /** Get/Set height */
+  height(value = undefined) {
+    if (typeof value === 'number') {
+      this._h = value;
+      return this;
+    }
+    return this._h;
+  }
+
+  /** Get/set mass */
+  mass(value = undefined) {
+    if (typeof value === 'number') {
+      this._mass = value;
+      return this;
+    }
+    return this._mass;
+  }
 
   /** Get/Set value for coefficient of restitution - will be used in collisions */
   coefficientOfRestitution(val = undefined) {
     if (val === undefined) return this._cr;
-
     if (val < 0) val = 0;
     else if (val > 1 || !isFinite(val) || isNaN(val)) val = 1;
     this._cr = val;
+    return this;
+  }
+
+  /** Get/Set value for coefficient of friction */
+  coefficientOfFriction(val = undefined) {
+    if (val === undefined) return this.μ;
+    if (val < 0) val = 0;
+    else if (val > 1 || !isFinite(val) || isNaN(val)) val = 1;
+    this.μ = val;
     return this;
   }
 
@@ -40,7 +78,9 @@ export class Body {
       this.vel.add(this.acc); // Apply acceleration - change of velocity
       this.pos.add(this.vel); // Apply velocity - change of position
       this.acc.set(0, 0); // Cancel acceleration
+      return true;
     }
+    return false;
   }
 
   /**
@@ -49,7 +89,7 @@ export class Body {
    */
   applyForce(force) {
     if (!this.static) {
-      let f = p5.Vector.div(force, this.mass);
+      let f = p5.Vector.div(force, this._mass);
       f = this.cbOnApply(f);
       this.acc.add(f);
     }
@@ -100,17 +140,35 @@ export class Body {
     throw new Error(`#<Body> :: method show() requires overload`);
   }
 
+  /** Given a body, calculate the response friction force to apply to said body */
+  friction(body) {
+    // Fr = -1 * μ * N * norm(i)
+    let Fr = body.vel.copy().normalize().setMag(-1 * this.μ * body.mass());
+    return Fr;
+  }
+
   /** <a, b> have collided... what now? */
   static collide(a, b) {
     if (a.solid && b.solid) {
-      let a_mu = a.vel.copy().mult(a.mass); // a: mass * velocity
-      let b_mu = b.vel.copy().mult(b.mass); // a: mass * velocity
+      // For static bodies: disregard mass
+      if (a.static) {
+        b.vel.mult(-b.coefficientOfRestitution());
+        return;
+      } else if (b.static) {
+        console.log("Static!");
+        a.vel.mult(-a.coefficientOfRestitution());
+        return;
+      }
+
+      const a_m = a.mass(), b_m = b.mass();
+      const a_mu = a.vel.copy().mult(a_m); // a: mass * velocity
+      const b_mu = b.vel.copy().mult(b_m); // a: mass * velocity
 
       // v(a) = [Cr * m(b) * [u(b) - u(a)] + m(a) * u(a) + m(b) * u(b)] / [m(a) + m(b)]
-      let velA = b.vel.copy().sub(a.vel).mult(b.mass).mult(a.coefficientOfRestitution()).add(a_mu).add(b_mu).div(a.mass + b.mass);
+      let velA = b.vel.copy().sub(a.vel).mult(b_m).mult(a.coefficientOfRestitution()).add(a_mu).add(b_mu).div(a_m + b_m);
 
       // v(b) = [Cr * m(a) * [u(a) - u(b)] + m(a) * u(a) + m(b) * u(b)] / [m(a) + m(b)]
-      let velB = a.vel.copy().sub(b.vel).mult(a.mass).mult(b.coefficientOfRestitution()).add(a_mu).add(b_mu).div(a.mass + b.mass);
+      let velB = a.vel.copy().sub(b.vel).mult(a_m).mult(b.coefficientOfRestitution()).add(a_mu).add(b_mu).div(a_m + b_m);
 
       a.vel.set(velA.x, velA.y);
       b.vel.set(velB.x, velB.y);
@@ -124,27 +182,72 @@ export class DrawableBody extends Body {
     super(x, y, w, h);
     this._stroke = null; // P5 colour object OR null
     this._fill = color(0); // P5 colour object OR null
-    this._mode = DrawableBodyMode.Rectange;
+    this._mode = DrawableBodyMode.Rectangle;
     this._path = []; // If mode=Path :: path to draw
     this._pointMotion = false; // Point shape in direction of motion?
+    this._bb = { pos: createVector(NaN, NaN), w: 0, h: 0 }; // BOUNDING BOX
+    this._calcBoundingBox();
+  }
+
+  /** Calculate bounding box */
+  _calcBoundingBox() {
+    switch (this._mode) {
+      case DrawableBodyMode.Point:
+        this._bb.pos = this.pos.copy();
+        this._bb.w = 1;
+        this._bb.h = 1;
+        break;
+      case DrawableBodyMode.Ellipse:
+        this._bb.pos = createVector(this.pos.x - this._w / 2, this.pos.y - this._h / 2);
+        this._bb.w = this._w;
+        this._bb.h = this._h;
+        break;
+      case DrawableBodyMode.Rectangle:
+        this._bb.pos = createVector(this.pos.x, this.pos.y);
+        this._bb.w = this._w;
+        this._bb.h = this._h;
+        break;
+      case DrawableBodyMode.Triangle:
+        this._bb.pos = createVector(this.pos.x - this._w / 2, this.pos.y - this._h / 2);
+        this._bb.w = this._w;
+        this._bb.h = this._h;
+        break;
+      case DrawableBodyMode.Path:
+        // TODO
+        if (this._world === null || this._world.logWarnings) console.warn(`Bounding box support for path not implemented`);
+        this._bb.pos = this.pos.copy();
+        this._bb.w = 1;
+        this._bb.h = 1;
+        break;
+      default:
+        throw new Error(`_calcBoundingBox(): Cannot create bounding box for DrawableBody of mode ${this._mode}`);
+    }
+  }
+
+  /** Get/Set width */
+  width(value = undefined) {
+    const v = super.width(value);
+    if (typeof value === 'number') this._calcBoundingBox();
+    return v;
+  }
+
+  /** Get/Set height */
+  height(value = undefined) {
+    const v = super.height(value);
+    if (typeof value === 'number') this._calcBoundingBox();
+    return v;
   }
 
   /** Set drawing mode */
   setDrawMode(mode) {
     this._mode = mode;
+    this._calcBoundingBox();
     return this;
   }
 
   /** Set _pointMotion */
   pointInDirectionOfMotion(bool) {
     this._pointDir = !!bool;
-    return this;
-  }
-
-  /** Set path to draw */
-  setPath(...path) {
-    if (this._mode !== DrawableBodyMode.Path) throw new Error(`Cannot utilise method - drawing mode is not path`);
-    this._path = path;
     return this;
   }
 
@@ -160,6 +263,21 @@ export class DrawableBody extends Body {
     return this;
   }
 
+  /** Set draw mode to Path */
+  setPolygon(...vertices) {
+    this._mode = DrawableBodyMode.Path;
+    if (vertices[0] !== null) {
+      this._path = vertices;
+      this._calcBoundingBox();
+    }
+    return this;
+  }
+
+  update() {
+    const a = super.update();
+    if (a) this._calcBoundingBox();
+  }
+
   show() {
     if (this._stroke === null) noStroke(); else stroke(this._stroke);
     if (this._fill === null) noFill(); else fill(this._fill);
@@ -169,10 +287,10 @@ export class DrawableBody extends Body {
         point(this.pos.x, this.pos.y);
         break;
       case DrawableBodyMode.Ellipse:
-        ellipse(this.pos.x, this.pos.y, this.w, this.h);
+        ellipse(this.pos.x, this.pos.y, this._w, this._h);
         break;
-      case DrawableBodyMode.Rectange:
-        rect(this.pos.x, this.pos.y, this.w, this.h);
+      case DrawableBodyMode.Rectangle:
+        rect(this.pos.x, this.pos.y, this._w, this._h);
         break;
       case DrawableBodyMode.Path:
         beginShape();
@@ -180,7 +298,7 @@ export class DrawableBody extends Body {
         endShape();
         break;
       case DrawableBodyMode.Triangle: {
-        let w2 = this.w / 2, h2 = this.h / 2;
+        let w2 = this._w / 2, h2 = this._h / 2;
         push();
         translate(this.pos.x, this.pos.y);
         if (this._pointDir) {
@@ -195,6 +313,14 @@ export class DrawableBody extends Body {
       default:
         throw new Error(`show(): Unknown draw mode ${this._mode}`);
     }
+
+    if (this._world && this._world.debug) {
+      // Bounding Box
+      noFill();
+      stroke(0, 0, 250);
+      rect(this._bb.pos.x, this._bb.pos.y, this._bb.w, this._bb.h);
+    }
+
     return this;
   }
 
@@ -205,9 +331,9 @@ export class DrawableBody extends Body {
       return Math.floor(a.pos.x) === Math.floor(b.pos.x) && Math.floor(a.pos.y) === Math.floor(b.pos.y); // Points must be equal (to nearest pixel)
     } else if (a._mode === DrawableBodyMode.Ellipse && b._mode === DrawableBodyMode.Ellipse) { // Ellipse, Ellipse
       return collideCircleCircle(a.pos.x, a.pos.y, a.w, b.pos.x, b.pos.y, b.w);
-    } else if (a._mode === DrawableBodyMode.Rectange && b._mode === DrawableBodyMode.Rectange) { // Rectangle, Rectangle
+    } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Rectangle) { // Rectangle, Rectangle
       return collideRectRect(a.pos.x, a.pos.y, a.w, a.h, b.pos.x, b.pos.y, b.w, b.h);
-    } else if (a._mode === DrawableBodyMode.Rectange && b._mode === DrawableBodyMode.Ellipse) { // Rectangle, Ellipse
+    } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Ellipse) { // Rectangle, Ellipse
       return collideRectCircle(a.pos.x, a.pos.y, a.w, a.h, b.pos.x, b.pos.y, b.w);
     } else if (a._mode === DrawableBodyMode.Ellipse && b._mode === DrawableBodyMode.Rectangle) { // Ellipse, Rectangle
       return collideRectCircle(b.pos.x, b.pos.y, b.w, b.h, a.pos.x, a.pos.y, a.w);
@@ -220,7 +346,8 @@ export class DrawableBody extends Body {
     } else if (a._mode === DrawableBodyMode.Rectangle && b._mode === DrawableBodyMode.Point) { // Rectangle, Point
       return collidePointRect(b.pos.x, b.pos.y, a.pos.x, a.pos.y, a.w, a.h);
     } else {
-      console.warn(`collision(): Unable to determine colission between ${a} and ${b}`);
+      if (a._world.logWarnings || b._world.logWarnings)
+        console.warn(`collision(): Unable to determine colission between ${a} (${a._mode}) and ${b} (${b._mode})`);
       return false;
     }
   }

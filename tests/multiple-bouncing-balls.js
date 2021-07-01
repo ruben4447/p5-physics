@@ -2,7 +2,7 @@ import { DrawableBody } from '../src/Body.js';
 import { DrawableBodyMode, EdgeMode } from '../src/enums.js';
 import World from '../src/World.js';
 
-var world, plane;
+var world;
 
 // This will be exposed to the global scope
 globalThis.globals = {
@@ -11,10 +11,11 @@ globalThis.globals = {
 
 function createBody(x, y) {
   const b = new DrawableBody(x, y, 25, 25)
-    .setDrawMode(DrawableBodyMode.Triangle)
+    .setDrawMode(DrawableBodyMode.Ellipse)
     .fill(51)
+    .coefficientOfRestitution(0.7)
     .stroke(255);
-  // b.mass(Math.floor(random(1, 10)));
+  // b.mass = Math.floor(random(1, 10));
   return b;
 }
 
@@ -24,17 +25,9 @@ function setup() {
   world = new World(0, 0, width, height); // Create World covering entire canvas
   globals.world = world;
 
-  world.debug = true;
   world.background = color(0);
   world.edgeMode = EdgeMode.Bounce;
   world.G.set(0, 0.1);
-
-  plane = new DrawableBody(0, height - 25, width, 7)
-    .coefficientOfFriction(0.9)
-    .fill(89);
-  plane.static = true;
-  globals.plane = plane;
-  world.addBody(plane);
 }
 globalThis.setup = setup;
 

@@ -18,6 +18,8 @@ export class World {
     this.G = createVector(0, 0.1); // Gravity vector
     this.edgeMode = EdgeMode.None; // What to do when body encountered an edge?
     this.doCollisions = true;
+    this.debug = false;
+    this.logWarnings = false; // console.warn(...)
   }
 
   /** Get number of bodies in this World */
@@ -52,7 +54,7 @@ export class World {
     this.bodies.forEach(body => {
       // Apply gravity
       if (this.G) {
-        let G = p5.Vector.mult(this.G, body.mass); // Gravoty is constant regardless of mass
+        let G = p5.Vector.mult(this.G, body.mass()); // Gravoty is constant regardless of mass
         body.applyForce(G);
       }
 
@@ -79,6 +81,10 @@ export class World {
             if (collide && bodyA.vel.copy().sub(bodyB.vel).mag() > 0) { // Only execute if collision AND bodies are moving closer
               Body.collide(bodyA, bodyB);
               calculatedCollisions.push({ a: bodyA, b: bodyB });
+              // let FrA = bodyA.friction(bodyB);
+              // let FrB = bodyB.friction(bodyA);
+              // bodyA.applyForce(FrA);
+              // bodyB.applyForce(FrB);
             }
           }
         });
